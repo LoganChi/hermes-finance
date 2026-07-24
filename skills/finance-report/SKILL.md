@@ -25,10 +25,10 @@ tags: ["财经", "报导", "日报", "周报", "市场综述", "云文档", "可
 | 职能 | 脚本 | 凭证 | 实测 |
 |------|------|------|------|
 | 行情抓取 | `scripts/fetch_quote.py` | 无（公开接口） | ✅ 真实行情 |
-| 飞书云文档（建/读/插图） | `scripts/feishu_doc.py` | lark-cli 已认证 | 逻辑移植自 Claw |
+| 飞书云文档（建/读/插图） | `scripts/feishu_doc.py` | `FEISHU_APP_ID` + `FEISHU_APP_SECRET` | 直连 OpenAPI，无 lark-cli 依赖 |
 | 图像生成（封面/配图） | `scripts/gen_image.py` | `SENSENOVA_API_KEY` | ✅ 真实生图 |
 
-> `feishu_doc.py` 封装飞书官方 lark-cli（`npm i -g @larksuite/cli` + `lark-cli auth login`）。原因：飞书 docx 创建接口不支持带正文，lark-cli 官方处理了 markdown→docx 转换，最可靠。若用其他文档平台（Notion/Google Docs），替换此脚本即可。
+> `feishu_doc.py` 直连飞书 OpenAPI（需 `FEISHU_APP_ID` + `FEISHU_APP_SECRET` 环境变量）。内置 Markdown→docx blocks 转换，支持标题/列表/段落。若用其他文档平台（Notion/Google Docs），替换此脚本即可。
 
 **框架能力**（用你 agent 框架自带的，不在 skill 内重造）：
 
@@ -125,7 +125,7 @@ python scripts/fetch_quote.py sh000001,sz399001   # 批量，逗号分隔
 | 脚本 | 作用 | 依赖 | 凭证 |
 |------|------|------|------|
 | `scripts/fetch_quote.py` | A 股行情抓取（腾讯 `qt.gtimg.cn`，代码识别 + 字段解析 + 涨跌方向） | Python 标准库 | 无 |
-| `scripts/feishu_doc.py` | 飞书云文档（create_doc / read_doc / insert_media，封装 lark-cli） | lark-cli | lark-cli auth |
+| `scripts/feishu_doc.py` | 飞书云文档（create_doc / read_doc / insert_media，直连 OpenAPI） | Python 标准库 | `FEISHU_APP_ID` + `FEISHU_APP_SECRET` |
 | `scripts/gen_image.py` | 图像生成（直连 SenseNova，封面 + 配图，下载到本地） | Python 标准库 | `SENSENOVA_API_KEY` |
 
 每个脚本 `python <script>.py --help` 查看用法，输出均为 JSON（`ok` / `error` / 结果字段）。
