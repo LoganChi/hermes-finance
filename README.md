@@ -12,6 +12,6 @@ LoganChi/hermes-finance/skills/<skill-name>
 
 | Skill | 说明 |
 |-------|------|
-| [finance-report](skills/finance-report/) | 财经日报 / 周报 / 市场综述的 **Phase 1 搜索提炼指引**：财经数据源路由 + 笔记 6 维度结构 + 财经红线。完整流程图见 [skills/finance-report/flow.md](skills/finance-report/flow.md) |
+| [finance-report](skills/finance-report/) | 端到端财经报导生成（复刻 Hermes/Claw 报告管线 5 步）。**自带 3 个脚本**：行情抓取 / 飞书云文档 / 图像生成。完整流程图见 [flow.md](skills/finance-report/flow.md) |
 
-> ⚠️ 这些 skill **紧耦合 Hermes / Yubo.AI.Claw 报告管线**（依赖 `feishu_cli` / `image_gen` / `web_search` 等工具与 `ReportOrchestrator` 管线）。独立使用需自行适配工具依赖。
+> finance-report 的 `scripts/`（行情 / 飞书 / 生图）自包含，可在任意 agent 框架使用；仅需 `SENSENOVA_API_KEY` 与 lark-cli 认证。web_search / web_fetch / memory 用你框架自带的。
