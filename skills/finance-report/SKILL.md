@@ -27,6 +27,7 @@ tags: ["财经", "报导", "日报", "周报", "市场综述", "云文档", "可
 | 行情抓取 | `scripts/fetch_quote.py` | 无（公开接口） | ✅ 真实行情 |
 | 飞书云文档（建/读/插图） | `scripts/feishu_doc.py` | lark-cli 已认证 | 逻辑移植自 Claw |
 | 图像生成（封面/配图） | `scripts/gen_image.py` | `SENSENOVA_API_KEY` | ✅ 真实生图 |
+| 网页搜索 | `scripts/search.py` | `TAVILY_API_KEY`（可逗号分隔多 key） | ✅ 真实搜索 |
 
 > `feishu_doc.py` 封装飞书官方 lark-cli（`npm i -g @larksuite/cli` + `lark-cli auth login`）。原因：飞书 docx 创建接口不支持带正文，lark-cli 官方处理了 markdown→docx 转换，最可靠。若用其他文档平台（Notion/Google Docs），替换此脚本即可。
 
@@ -34,8 +35,7 @@ tags: ["财经", "报导", "日报", "周报", "市场综述", "云文档", "可
 
 | 职能 | Hermes/Claw 里的工具 | 说明 |
 |------|---------------------|------|
-| 网页搜索 | web_search | 接搜索 API |
-| 网页抓取 | web_fetch | HTTP 抓取 |
+| 网页抓取 | web_fetch | HTTP 抓取（深读搜索结果的全文） |
 | 执行脚本 | shell | 跑上面的 python 脚本 |
 | 持久笔记 | memory | 可选，跨会话 |
 
@@ -58,7 +58,13 @@ python scripts/fetch_quote.py sh000001,sz399001   # 批量，逗号分隔
 
 ### Step 1 · 搜索与提炼
 
-并行 `web_search` 5-7 个维度查询 + `web_fetch` 深读最多 3 个关键页面，提炼 **2000-4000 字笔记**，按下方 6 维度组织，存入 `memory`（key: `report-notes-{日期}`）。
+并行搜索 5-7 个维度：
+```bash
+python scripts/search.py "财联社 今日财经要闻" --max 5
+python scripts/search.py "央行 LPR 调整 {月份}" --max 5
+python scripts/search.py "{行业} 板块 异动" --max 5
+```
++ `web_fetch` 深读最多 3 个关键页面，提炼 **2000-4000 字笔记**，按下方 6 维度组织，存入 `memory`（key: `report-notes-{日期}`）。
 
 **web_fetch 3 次预算**：第 1 次 深度要闻、第 2 次 汇率/商品/外围、第 3 次 兜底。行情已由 Step 0 预取时，省下的预算全留给要闻。
 
@@ -127,6 +133,7 @@ python scripts/fetch_quote.py sh000001,sz399001   # 批量，逗号分隔
 | `scripts/fetch_quote.py` | A 股行情抓取（腾讯 `qt.gtimg.cn`，代码识别 + 字段解析 + 涨跌方向） | Python 标准库 | 无 |
 | `scripts/feishu_doc.py` | 飞书云文档（create_doc / read_doc / insert_media，封装 lark-cli） | lark-cli | lark-cli auth |
 | `scripts/gen_image.py` | 图像生成（直连 SenseNova，封面 + 配图，下载到本地） | Python 标准库 | `SENSENOVA_API_KEY` |
+| `scripts/search.py` | 网页搜索（直连 Tavily，多 key 轮换，429 自动换 key） | Python 标准库 | `TAVILY_API_KEY` |
 
 每个脚本 `python <script>.py --help` 查看用法，输出均为 JSON（`ok` / `error` / 结果字段）。
 
