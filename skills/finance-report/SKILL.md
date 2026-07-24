@@ -18,19 +18,28 @@ tags: ["财经", "报导", "日报", "周报", "市场综述", "云文档", "可
 
 > 怎么判断你在哪种模式：若上方 prompt 出现「你处于报告生成流程的第1阶段」字样 → 你在 Claw 管线内，只做 Step 0-1。
 
-## 工具依赖（按职能匹配，名称可不同）
+## 工具与脚本（自包含 + 框架能力）
 
-| 职能 | 本 skill 写法 | Hermes/Claw 里的工具 | 你需要的能力 |
-|------|--------------|---------------------|-------------|
-| 网页搜索 | `web_search` | web_search | 任意搜索 API |
-| 网页抓取 | `web_fetch` | web_fetch | HTTP 抓取 |
-| 执行脚本 | `shell` | shell | 能跑 python |
-| 创建云文档 | `create_doc` | feishu_cli | 文档平台 API（飞书/Notion/Google Docs 等） |
-| 插入配图 | `insert_media` | feishu_cli | 文档插图能力 |
-| 图像生成 | `image_gen` | image_gen | 文生图 API |
-| 持久笔记 | `memory` | memory | 可选，跨会话笔记 |
+**本 skill 自带脚本**（覆盖管线的全部平台集成，clone 即用）：
 
-> ⚠️ **数据接口需自行验证**：腾讯行情 `qt.gtimg.cn`、财联社、华尔街见闻、金十等源可能受网络/区域/反爬限制。本 skill 给出 Hermes/Claw 验证过的方案，你的环境若访问失败，请替换为等价数据源。
+| 职能 | 脚本 | 凭证 | 实测 |
+|------|------|------|------|
+| 行情抓取 | `scripts/fetch_quote.py` | 无（公开接口） | ✅ 真实行情 |
+| 飞书云文档（建/读/插图） | `scripts/feishu_doc.py` | lark-cli 已认证 | 逻辑移植自 Claw |
+| 图像生成（封面/配图） | `scripts/gen_image.py` | `SENSENOVA_API_KEY` | ✅ 真实生图 |
+
+> `feishu_doc.py` 封装飞书官方 lark-cli（`npm i -g @larksuite/cli` + `lark-cli auth login`）。原因：飞书 docx 创建接口不支持带正文，lark-cli 官方处理了 markdown→docx 转换，最可靠。若用其他文档平台（Notion/Google Docs），替换此脚本即可。
+
+**框架能力**（用你 agent 框架自带的，不在 skill 内重造）：
+
+| 职能 | Hermes/Claw 里的工具 | 说明 |
+|------|---------------------|------|
+| 网页搜索 | web_search | 接搜索 API |
+| 网页抓取 | web_fetch | HTTP 抓取 |
+| 执行脚本 | shell | 跑上面的 python 脚本 |
+| 持久笔记 | memory | 可选，跨会话 |
+
+> ⚠️ **数据接口需自行验证**：财联社、华尔街见闻、金十等新闻源可能受网络/区域/反爬限制，访问失败请替换为等价源。
 
 ## 工作流（5 步）
 
@@ -55,17 +64,29 @@ python scripts/fetch_quote.py sh000001,sz399001   # 批量，逗号分隔
 
 ### Step 2 · 创建文档 + 封面图
 
-- 基于笔记撰写报告正文（Markdown，4000-8000 字，结构：摘要 → 分章节正文 → 总结）
-- `create_doc` 创建云文档，拿 document_id
-- `image_gen` 生成封面图（建议 1920x1080）
+- 基于笔记撰写报告正文（Markdown，4000-8000 字，结构：摘要 → 分章节正文 → 总结），存为 `report.md`
+- 创建云文档：
+  ```bash
+  python scripts/feishu_doc.py create_doc --title "财经日报" --file report.md
+  ```
+  从返回 JSON 取 `document_id`
+- 生成封面图：
+  ```bash
+  python scripts/gen_image.py --prompt "..." --size 1920x1080
+  ```
+  从返回 JSON 取 `saved_path`
 - **正文禁止任何 URL**；外部链接只放在文末「## 参考来源」章节
 
 ### Step 3 · 插入配图
 
-- 读文档章节结构
+- 读文档章节结构：`python scripts/feishu_doc.py read_doc --doc <document_id>`
 - 为 2-3 个核心章节生成配图 prompt（具体描述画面/色调/构图）
-- 逐张 `image_gen`（1024x1024）+ `insert_media` 插入对应章节后（宽≈560，居中）
-- 图片**串行**生成（API 速率限制），单张失败跳过、不阻塞
+- 逐张生成 + 插入：
+  ```bash
+  python scripts/gen_image.py --prompt "..." --size 1024x1024                          # 拿 saved_path
+  python scripts/feishu_doc.py insert_media --doc <id> --file <saved_path> --width 560 --align center --selection "章节标题"
+  ```
+- 图片**串行**生成（SenseNova 速率限制，间隔 ≥15s），单张失败跳过、不阻塞
 
 ### Step 4 · 总结交付
 
@@ -99,9 +120,15 @@ python scripts/fetch_quote.py sh000001,sz399001   # 批量，逗号分隔
 - **不编造数据**：接口失败或搜不到，该维度写「数据暂缺」，不填估数
 - 笔记末尾附免责声明：「本报导仅供研究参考，不构成投资建议。」
 
-## 脚本
+## 脚本总览
 
-- `scripts/fetch_quote.py`：A 股实时行情抓取（腾讯接口 `qt.gtimg.cn`，Python 标准库，已验证真实数据）。负责代码识别、批量抓取、字段解析、涨跌方向计算。
+| 脚本 | 作用 | 依赖 | 凭证 |
+|------|------|------|------|
+| `scripts/fetch_quote.py` | A 股行情抓取（腾讯 `qt.gtimg.cn`，代码识别 + 字段解析 + 涨跌方向） | Python 标准库 | 无 |
+| `scripts/feishu_doc.py` | 飞书云文档（create_doc / read_doc / insert_media，封装 lark-cli） | lark-cli | lark-cli auth |
+| `scripts/gen_image.py` | 图像生成（直连 SenseNova，封面 + 配图，下载到本地） | Python 标准库 | `SENSENOVA_API_KEY` |
+
+每个脚本 `python <script>.py --help` 查看用法，输出均为 JSON（`ok` / `error` / 结果字段）。
 
 ## 完整流程图
 
