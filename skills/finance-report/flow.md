@@ -29,14 +29,15 @@ flowchart TD
 
     P1 --> P2
     subgraph P2 [Phase 2 · 建文档 + 封面]
-        P2a[LLM 写正文 4000-8000 字<br/>正文禁任何 URL] --> P2b[feishu_doc.py create_doc<br/>直连 OpenAPI]
-        P2b --> P2c[image_gen 封面 1920x1080]
+        P2a[LLM 写正文 4000-8000 字<br/>正文禁任何 URL] --> P2b[lint_md.py 校验+规范化<br/>超链接→纯URL / 移除飞书URL]
+        P2b --> P2c[feishu_cli create_doc]
+        P2c --> P2d[image_gen 封面 1920x1080]
     end
 
     P2 --> P3
     subgraph P3 [Phase 3 · 插配图]
-        P3a[feishu_doc.py read_doc 读章节] --> P3b[LLM 生成 2-3 配图 prompt]
-        P3b --> P3c[逐张 image_gen 1024x1024<br/>+ feishu_doc.py insert_media]
+        P3a[feishu_cli read_doc 读章节] --> P3b[LLM 生成 2-3 配图 prompt]
+        P3b --> P3c[逐张 image_gen 1024x1024<br/>+ feishu_cli insert_media]
     end
 
     P3 --> P4[Phase 4 · 自然语言总结<br/>LLM 150-300 字 · 30s 超时降级]
