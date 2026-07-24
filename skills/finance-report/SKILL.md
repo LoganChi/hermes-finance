@@ -1,22 +1,8 @@
 ---
 name: finance-report
 description: 财经日报/周报/市场综述的搜索提炼指引。在 Hermes (Yubo.AI.Claw) 报告管线 Phase 1 注入，编排财经数据源采集与笔记维度结构。仅在报告管线内有效。
-triggers:
-  - 财经日报
-  - 财经周报
-  - 市场日报
-  - 财经报告
-  - 财经分析报告
-  - 财经摘要
-  - finbrief
-  - finance report
-tags:
-  - 财经
-  - 报导
-  - 日报
-  - 周报
-  - 市场综述
-  - 飞书
+triggers: ["财经日报", "财经周报", "市场日报", "财经报告", "财经分析报告", "财经摘要", "finbrief", "finance report"]
+tags: ["财经", "报导", "日报", "周报", "市场综述", "飞书"]
 ---
 
 # 财经报导 · Phase 1 搜索提炼指引
