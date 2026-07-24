@@ -25,11 +25,12 @@ tags: ["财经", "报导", "日报", "周报", "市场综述", "云文档", "可
 | 职能 | 脚本 | 凭证 | 实测 |
 |------|------|------|------|
 | 行情抓取 | `scripts/fetch_quote.py` | 无（公开接口） | ✅ 真实行情 |
-| 飞书云文档（建/读/插图） | `scripts/feishu_doc.py` | `FEISHU_APP_ID` + `FEISHU_APP_SECRET` | 直连 OpenAPI，无 lark-cli 依赖 |
+| 飞书云文档（建/读/插图） | `scripts/feishu_doc.py` | lark-cli 已认证 | 逻辑移植自 Claw |
 | 图像生成（封面/配图） | `scripts/gen_image.py` | `SENSENOVA_API_KEY` | ✅ 真实生图 |
 | 网页搜索 | `scripts/search.py` | `TAVILY_API_KEY`（可逗号分隔多 key） | ✅ 真实搜索 |
+| md 校验/规范化 | `scripts/lint_md.py` | 无 | ✅ 实测（7 类问题） |
 
-> `feishu_doc.py` 直连飞书 OpenAPI（需 `FEISHU_APP_ID` + `FEISHU_APP_SECRET` 环境变量）。内置 Markdown→docx blocks 转换，支持标题/列表/段落。若用其他文档平台（Notion/Google Docs），替换此脚本即可。
+> `feishu_doc.py` 封装飞书官方 lark-cli（`npm i -g @larksuite/cli` + `lark-cli auth login`）。原因：飞书 docx 创建接口不支持带正文，lark-cli 官方处理了 markdown→docx 转换，最可靠。若用其他文档平台（Notion/Google Docs），替换此脚本即可。
 
 **框架能力**（用你 agent 框架自带的，不在 skill 内重造）：
 
@@ -71,16 +72,21 @@ python scripts/search.py "{行业} 板块 异动" --max 5
 ### Step 2 · 创建文档 + 封面图
 
 - 基于笔记撰写报告正文（Markdown，4000-8000 字，结构：摘要 → 分章节正文 → 总结），存为 `report.md`
+- **校验 + 规范化 md**（create_doc 前必跑；lark-cli 不支持 `[text](url)` 超链接等）：
+  ```bash
+  python scripts/lint_md.py report.md --fix        # 自动修复：超链接→纯URL / 移除飞书URL
+  python scripts/lint_md.py report.md --check      # 或只检查，有问题 exit 1（可 gating）
+  ```
 - 创建云文档：
   ```bash
   python scripts/feishu_doc.py create_doc --title "财经日报" --file report.md
   ```
-  从返回 JSON 取 `document_id`
+  从返回 JSON 取 `document_id`（→ Step 3 要用）
 - 生成封面图：
   ```bash
   python scripts/gen_image.py --prompt "..." --size 1920x1080
   ```
-  从返回 JSON 取 `saved_path`
+  从返回 JSON 取 `saved_path`（→ Step 3 要用）
 - **正文禁止任何 URL**；外部链接只放在文末「## 参考来源」章节
 
 ### Step 3 · 插入配图
@@ -97,6 +103,19 @@ python scripts/search.py "{行业} 板块 异动" --max 5
 ### Step 4 · 总结交付
 
 用 150-300 字自然语言告诉用户：做了什么、关键结论、文档链接。不要堆砌「已生成 / 已上传」执行回执式播报。
+
+## 阶段间状态传递
+
+脚本输出 JSON，阶段间靠它传递状态（Hermes/Claw 里由 `ReportStateCollectorHook` 自动收集；独立使用时手动从 JSON 取）：
+
+| 状态 | 来源 | 下一步用途 |
+|------|------|-----------|
+| `document_id` | `feishu_doc.py create_doc` 返回 | Step 3 `read_doc` / `insert_media` 的 `--doc` |
+| `saved_path` | `gen_image.py` 返回 | Step 3 `insert_media` 的 `--file` |
+| 来源链接 | `search.py` 的 `results[].url` | 报告「## 参考来源」章节 |
+| 行情 JSON | `fetch_quote.py` 返回 | 笔记「市场总览」「数据看板」维度 |
+
+> Hermes/Claw 还有个 `ReportStateCollectorHook`：在 `web_search` 执行后悄悄解析 `[N] Title / URL` 收集成 SourceLinks，喂给 Phase 2 参考来源章节。独立使用时，从 `search.py` 的 `results[].url` 手动收集即可。
 
 ## 财经笔记 6 维度结构
 
@@ -131,9 +150,10 @@ python scripts/search.py "{行业} 板块 异动" --max 5
 | 脚本 | 作用 | 依赖 | 凭证 |
 |------|------|------|------|
 | `scripts/fetch_quote.py` | A 股行情抓取（腾讯 `qt.gtimg.cn`，代码识别 + 字段解析 + 涨跌方向） | Python 标准库 | 无 |
-| `scripts/feishu_doc.py` | 飞书云文档（create_doc / read_doc / insert_media，直连 OpenAPI） | Python 标准库 | `FEISHU_APP_ID` + `FEISHU_APP_SECRET` |
+| `scripts/feishu_doc.py` | 飞书云文档（create_doc / read_doc / insert_media，封装 lark-cli） | lark-cli | lark-cli auth |
 | `scripts/gen_image.py` | 图像生成（直连 SenseNova，封面 + 配图，下载到本地） | Python 标准库 | `SENSENOVA_API_KEY` |
 | `scripts/search.py` | 网页搜索（直连 Tavily，多 key 轮换，429 自动换 key） | Python 标准库 | `TAVILY_API_KEY` |
+| `scripts/lint_md.py` | 报告 md 校验/规范化（行内超链接/飞书URL/标题跳级/代码块，针对 lark-cli 限制） | Python 标准库 | 无 |
 
 每个脚本 `python <script>.py --help` 查看用法，输出均为 JSON（`ok` / `error` / 结果字段）。
 
