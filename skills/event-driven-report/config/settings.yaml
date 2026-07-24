@@ -1,0 +1,104 @@
+# ===== A股事件驱动交易系统 · 配置 =====
+# 所有"内容"(归因规则/prompt模板/报告文案/示例新闻/板块表)都在 config/ 和 data/ 下。
+# 改这里和那些文件即可调整系统行为，核心逻辑(匹配引擎/防幻觉清洗/pipeline流程)无需动。
+
+# 行情数据源（akshare 免费但易限流 / tushare 稳定走代理）
+data:
+  backend: tushare          # akshare | tushare
+  tushare:
+    token: "${TUSHARE_TOKEN}"                       # 走环境变量, 不落盘
+    api_server: "https://fastapic.stockai888.top"   # 第三方代理(stockai888); 留空=官方tushare.pro
+
+# LLM 接口配置
+llm:
+  provider: "openai_compatible"               # mock | openai_compatible
+  base_url: "https://api.deepseek.com/v1"     # DeepSeek 官方(OpenAI兼容)
+  api_key: "${DEEPSEEK_API_KEY}"              # 走环境变量, 不落盘; 未设置时降级mock
+  model: "deepseek-v4-flash"                  # DeepSeek-V4 快速档(2026-07起 deepseek-chat 下线, 改 v4-flash)
+  temperature: 0.2
+  max_retries: 1
+  timeout: 60               # 单次调用超时秒数，超时则回退mock
+  skip_ssl: false           # DeepSeek官方HTTPS, 无需跳过SSL
+
+# 新闻源
+news:
+  source: "akshare"           # demo | newsnow | tushare | akshare
+  limit: 50
+  newsnow:
+    endpoint: ""              # TODO(用户): 填真实 newsnow 抓取配置
+  tushare:
+    token: "${TUSHARE_TOKEN}"                          # 走环境变量
+    api_server: "https://fastapic.stockai888.top"      # 注意:该代理不支持news接口,需官方tushare+news付费权限
+  akshare:
+    mode: "global"            # cctv(按日期历史新闻) | global(东财实时快讯)
+    date: ""                  # cctv模式: YYYYMMDD
+
+# 各"内容"配置文件路径（相对项目根）
+paths:
+  sector_map: "data/sector_map.json"
+  industry_chain: "data/industry_chain.json"
+  event_rules: "config/event_rules.yaml"
+  prompts: "config/prompts.yaml"
+  report_templates: "config/report_templates.yaml"
+  demo_news: "data/demo_news.json"
+
+# 映射器参数
+mapper:
+  watch_pool_topn: 8          # watch_pool 截断长度
+
+# 流水线参数
+pipeline:
+  max_workers: 5              # 新闻并发处理数（LLM调用是IO密集，并发提速）
+
+# 竞价验证（里程碑3）：用日K开盘价(集合竞价结果)验证watch_pool是否被资金确认
+auction:
+  enabled: true              # 是否在pipeline中做竞价验证
+  avg_n: 5                   # 量比均量窗口(交易日)
+  confirm_gap: 0.03          # 资金确认: 高开幅度阈值
+  confirm_vol_ratio: 2.0     # 资金确认: 量比阈值
+  high_open_warning: 0.07    # 高开警报阈值(接盘风险)
+  max_workers: 8             # 并发拉行情数
+
+# 回测（里程碑5）
+backtest:
+  hold_days: 5               # 持有交易日数
+
+# 评分体系（里程碑7：市场风控 + RPS + 权重参数化）
+scoring:
+  threshold: 5              # 评分门槛(总分≥才建仓)
+  board_min: 0.6            # 板块共振阈值(成分股多头比例)
+  oversold_drawdown: 0.35   # 超跌型: 一年高点回调阈值
+  strong_drawdown: 0.15     # 强势型: 回调阈值(配合均线多头)
+
+# 模拟交易（里程碑6）：虚拟账户前瞻跟踪策略，不接真钱
+paper:
+  account_path: "data/paper_account.json"   # 账户持久化路径
+  initial_capital: 100000    # 初始虚拟资金
+  position_pct: 0.1          # 单只仓位(占初始资金)
+  max_positions: 8           # 最大持仓数
+  hold_days: 5               # 默认持有交易日
+  stop_loss: -0.08           # 止损(-8%)
+  take_profit: 0.15          # 止盈(+15%)
+
+# ===== 持久化扩展模块（src/db/，可选 · 暂未接入业务）=====
+# src/db/ 是独立的 ORM 扩展模块（SQLAlchemy 2.0），现有业务代码仍走 JSON，
+# 完全不受影响。后续以依赖注入方式接入时，把下面三项从 json 改成 db 即可切换。
+db:
+  backend: sqlite            # sqlite | postgresql | mysql
+  url: ""                    # 留空=用 backend 默认；填完整 URL 则覆盖 backend
+  echo: false                # 打印 SQL 调试日志
+
+# 各持久化链路的 backend 选择（json=现状不变 / db=走 src/db 扩展模块）。
+# 现在 3 项均为 json：现有代码不引用 src/db，行为零变化。
+persistence:
+  events: json               # 事件库 json(events_store.jsonl) | db(events 表)
+  paper: json                # 模拟盘 json(paper_account.json) | db(paper_* 表)
+  backtest: db               # 回测结果 落 db(backtest_runs/trades 表) | json=不落盘
+  historical: db             # 历史事件标注库（仅支持 db；保存时防未来函数物理校验）
+
+# 历史事件标注库（防未来函数 + 事后真值，回测专用）
+history:
+  seed_path: "data/historical_events.jsonl"   # 唯一权威 seed 源（git diff 审计）
+  benchmark_index: "000300"                    # 默认基准
+  calendar_cache: "data/trade_calendar.json"   # 交易日历缓存（akshare 拉取后落盘，offline 兜底）
+  calendar_refresh_days: 30                    # 缓存有效期；过期重拉 akshare

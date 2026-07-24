@@ -1,0 +1,71 @@
+# ===== mock 归因规则（无 LLM key 时用，保证 demo 跑通） =====
+# 规则按顺序匹配，命中即用；全不命中走 default。
+# match 语义：多个关键词组，【组内任一命中(OR)】，【组之间全部命中(AND)】。
+
+# 合法事件类型白名单（真实 LLM 模式也会用它做兜底校验）
+valid_event_types:
+  - 供给收缩
+  - 政策利好
+  - 技术突破
+  - 业绩
+  - 并购重组
+  - 黑天鹅
+  - 需求变化
+  - 中性
+  - 噪音
+
+rules:
+  - id: supply_lithium
+    match:
+      - [停产, 检修, 供给]
+      - [锂, 矿]
+    event_type: 供给收缩
+    sentiment: 利好
+    beneficiary_sectors: [锂矿, 盐湖提锂]
+    victim_sectors: [磷酸铁锂正极]
+    chain_reasoning: "上游停产/检修→锂盐供给收缩→锂矿/盐湖提锂资源端受益；同时正极厂原料成本承压。"
+    confidence: 0.75
+
+  - id: policy_nev
+    match:
+      - [补贴, 政策]
+      - [新能源, 车]
+    event_type: 政策利好
+    sentiment: 利好
+    beneficiary_sectors: [新能源车]
+    victim_sectors: []
+    chain_reasoning: "补贴/支持政策落地→新能源车需求端提振→整车板块受益。"
+    confidence: 0.7
+
+  - id: tech_battery
+    match:
+      - [突破]
+      - [电池, 固态]
+    event_type: 技术突破
+    sentiment: 利好
+    beneficiary_sectors: [新能源车, 锂矿]
+    victim_sectors: []
+    chain_reasoning: "电池/固态技术突破→新能源车产品力提升带动销量，同时拉动上游锂资源需求。"
+    confidence: 0.65
+
+  - id: earnings_baijiu
+    match:
+      - [业绩, 超预期, 增长]
+      - [茅台, 白酒]
+    event_type: 业绩
+    sentiment: 利好
+    beneficiary_sectors: [白酒]
+    victim_sectors: []
+    chain_reasoning: "龙头业绩超预期→印证板块景气→白酒板块情绪受益。"
+    confidence: 0.7
+
+# 全部规则未命中时的兜底
+default:
+  event_type: 噪音
+  sentiment: 中性
+  confidence: 0.5
+  chain_reasoning: "未命中任何归因规则，视为噪音。"
+
+# mock 模式的其它默认值
+mock:
+  time_horizon: 短期

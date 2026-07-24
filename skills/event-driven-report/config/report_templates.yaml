@@ -1,0 +1,35 @@
+# ===== 报告文案模板（renderer 渲染时读取） =====
+# 改这里即可调整报告措辞/标题/标签，无需动 renderer 代码。
+
+disclaimer: "⚠️ 本报告为事件归因与产业链映射，不预测股价，不构成任何投资建议。"
+noise_message: "> 判定为噪音，已过滤。"
+
+sections:
+  news_title_prefix: "# 📰 "
+  event_analysis: "## 🎯 事件归因"
+  chain_mapping: "## 🧩 产业链映射"
+  representative: "## 🏷️ 代表标的"
+  watch_pool: "## ⏰ 待竞价验证 watch_pool"
+  missed_sectors: "## ⚠️ 映射表缺失板块"
+  chain_reasoning: "## 🔗 归因链路"
+
+labels:
+  source: "来源"
+  published_at: "发布时间"
+  link: "链接"
+  beneficiary: "受益板块"
+  victim: "受损板块"
+  sectors_hit: "命中映射表的板块"
+  victim_pool_ref: "受损池（仅参考，独立列出）"
+  no_value: "无"
+
+table_headers:
+  event: ["字段", "值"]
+  representative: ["代码", "名称", "角色"]
+
+placeholders:
+  no_news: "（无新闻）"
+  no_title: "（无标题）"
+  unknown_source: "未知来源"
+
+missed_sectors_hint: "以下板块在映射表中缺失，建议补表："
