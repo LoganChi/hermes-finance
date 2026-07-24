@@ -168,7 +168,7 @@ def _parse_inline(text):
 # ── 公开接口 ──────────────────────────────────────────────────────────────
 
 def create_doc(title, content):
-    """创建云文档 + 写入正文。"""
+    """创建云文档 + 写入正文（分批，每次最多45个block，飞书限制50）。"""
     # 1. 创建空文档
     res = _api("POST", "/docx/v1/documents", body={"title": title})
     if not res["ok"]:
@@ -176,13 +176,18 @@ def create_doc(title, content):
     doc_id = res["data"].get("document", {}).get("document_id", "")
     if not doc_id:
         return {"ok": False, "error": "创建文档成功但未返回 document_id", "raw": res["data"]}
-    # 2. 写入正文
+    # 2. 分批写入正文（飞书 API 每次最多 50 个 children blocks）
+    warnings = []
     if content and content.strip():
         blocks = _md_to_blocks(content)
-        if blocks:
-            res2 = _api("POST", f"/docx/v1/documents/{doc_id}/blocks/{doc_id}/children", body={"children": blocks})
+        BATCH = 45  # 留 5 个余量
+        for i in range(0, len(blocks), BATCH):
+            chunk = blocks[i:i + BATCH]
+            res2 = _api("POST", f"/docx/v1/documents/{doc_id}/blocks/{doc_id}/children", body={"children": chunk})
             if not res2["ok"]:
-                return {"ok": True, "document_id": doc_id, "warning": f"文档已创建但正文写入失败: {res2.get('error')}"}
+                warnings.append(f"第{i//BATCH+1}批写入失败: {res2.get('error')}")
+    if warnings:
+        return {"ok": True, "document_id": doc_id, "url": f"https://bytedance.feishu.cn/docx/{doc_id}", "warning": "; ".join(warnings)}
     return {"ok": True, "document_id": doc_id, "url": f"https://bytedance.feishu.cn/docx/{doc_id}"}
 
 
