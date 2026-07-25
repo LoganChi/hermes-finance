@@ -9,7 +9,7 @@ tags: ["A股", "事件驱动", "盘前报告", "标的映射", "产业链", "竞
 
 把"新闻 → 事件归因 → 标的池 → 产业链扩散 → [竞价验证] → 多 tab HTML 报告"这条**确定性链路**封装成一个自包含 Python 包，clone 即跑。
 
-与 [finance-report](../finance-report/) 互补并列：finance-report 是"宏观综述/日报周报"导向（web_search + 笔记 6 维度 + 云文档）；本 skill 是"**事件驱动/标的映射**"导向——把每条新闻拆成「事件 + 受益板块 + 代表标的 + 产业链扩散 + 资金确认」，产出可直接扫描标的的 HTML 报告。
+与 [finance-report](../finance-report/) 互补并列：[finance-report](../finance-report/) 是"宏观综述/日报周报"导向（web_search + 笔记 6 维度 + 云文档）；本 skill 是"**事件驱动/标的映射**"导向——把每条新闻拆成「事件 + 受益板块 + 代表标的 + 产业链扩散 + 资金确认」，产出可直接扫描标的的 HTML 报告。
 
 ## 重型特例声明（务必先读）
 
@@ -38,10 +38,10 @@ tags: ["A股", "事件驱动", "盘前报告", "标的映射", "产业链", "竞
 
 | 源 | 模块 | 用途 | 凭证 |
 |----|------|------|------|
-| newsnow 聚合 | `newsnow_source.py` | 财联社电报 + 华尔街见闻实时（经 newsnow.busiyi.world 二次聚合） | 无（公开 API + 伪造 UA/Referer） |
+| newsnow 聚合 | `newsnow_source.py` | 财联社电报 + 华尔街见闻实时 + 金十数据（宏观/央行）+ 格隆汇（港股/A股），四源并发，财联社正文回填(~1.6k字) | 无（公开 API + 伪造 UA/Referer） |
 | akshare cctv | `akshare_source.py` mode=cctv | 央视财经新闻（按日期，可回测） | 无 |
 | akshare global | `akshare_source.py` mode=global | 东财全球实时快讯 | 无 |
-| tushare | `tushare_source.py` | 备选（需付费 news 权限） | `TUSHARE_TOKEN` |
+| tushare | `tushare_source.py` | 备选（需付费 news 权限；中转站不支持 news） | `TUSHARE_TOKEN` |
 | jsonl 快照 | `jsonl_news_source.py` | 周末累积模式历史回放 | 无 |
 
 **财联社正文回填（关键设计）**：newsnow 返回的财联社电报**默认只有标题**，喂 LLM 信息量不足。`newsnow_source.py` 在拉到列表后，对每条 url 并发回抓财联社 detail 页正文（~1.6k 字），用 `apparent_encoding` 修 requests 把 UTF-8 当 latin-1 解的乱码，正则去标签。华尔街见闻是 SPA 抓不到正文，保持 None 由 extractor 兜底。失败/超时不阻断主流程。
@@ -93,11 +93,11 @@ DeepSeek（OpenAI 兼容）按 `config/prompts.yaml` 的 system+user 模板抽�
 | `data/industry_chain.json` | 板块上下游图谱（产业链扩散） |
 
 ## 脚本总览
-| 脚本 | 作用 | 标准库? | 凭证 |
-|------|------|--------|------|
-| `scripts/gen_weekend_report.py` | 今日/盘前主入口，`--today` 输出 HTML | ✗（全套依赖） | `DEEPSEEK_API_KEY` |
-| `scripts/jsonl_news_source.py` | jsonl 历史新闻适配器（gen_weekend_report 依赖） | ✓ | 无 |
-| `scripts/run_report.py` | 仅标准库 thin wrapper，subprocess 调上面的，输出 JSON（供程序调用） | ✓ | 无（自身） |
+| 脚本 | 作用 | 用法 | 标准库? | 凭证 |
+|------|------|------|--------|------|
+| `scripts/gen_weekend_report.py` | 今日/盘前主入口。`--today` 模式拉四源新闻（财联社+华尔街见闻+金十+格隆汇）→ DeepSeek 抽取 → 标的映射 → HTML。跳过竞价验证（盘前无日K） | `python gen_weekend_report.py --today` | ✗（全套依赖） | `DEEPSEEK_API_KEY` |
+| `scripts/run_report.py` | 仅标准库 thin wrapper，subprocess 调 gen_weekend_report，输出结构化 JSON（`ok/error/html_path/news_count`），供上层 agent 框架程序化调用 | `python run_report.py --today` / `--today --open`（自动打开浏览器） | ✓ | 无（自身） |
+| `scripts/jsonl_news_source.py` | jsonl 历史新闻适配器。把本地 jsonl 快照（每行一个 json dict）映射成 NewsItem，接入 pipeline。用于周末累积模式或历史回放 | 被 pipeline 内部调用（`news.source=jsonl`） | ✓ | 无 |
 
 ## 完整流程图
 见同目录 `flow.md`：mermaid 画 news→extract→map→chain→auction→render 全链路 + 数据源路由。

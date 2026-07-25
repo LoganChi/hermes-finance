@@ -25,12 +25,12 @@ tags: ["财经", "报导", "日报", "周报", "市场综述", "云文档", "可
 | 职能 | 脚本 | 凭证 | 实测 |
 |------|------|------|------|
 | 行情抓取 | `scripts/fetch_quote.py` | 无（公开接口） | ✅ 真实行情 |
-| 飞书云文档（建/读/插图） | `scripts/feishu_doc.py` | lark-cli 已认证 | 逻辑移植自 Claw |
+| 飞书云文档（建/读/插图） | `scripts/feishu_doc.py` | `FEISHU_APP_ID` + `FEISHU_APP_SECRET`（直连 OpenAPI） | ✅ 建文档+写正文（分批） |
 | 图像生成（封面/配图） | `scripts/gen_image.py` | `SENSENOVA_API_KEY` | ✅ 真实生图 |
-| 网页搜索+深读 | `scripts/search.py` | `TAVILY_API_KEY`（可逗号分隔多 key） | ✅ 真实搜索（search + extract 两模式） |
+| 网页搜索+页面深读 | `scripts/search.py` | `TAVILY_API_KEY`（可逗号分隔多 key） | ✅ search + extract 双模式 |
 | md 校验/规范化 | `scripts/lint_md.py` | 无 | ✅ 实测（7 类问题） |
 
-> `feishu_doc.py` 封装飞书官方 lark-cli（`npm i -g @larksuite/cli` + `lark-cli auth login`）。原因：飞书 docx 创建接口不支持带正文，lark-cli 官方处理了 markdown→docx 转换，最可靠。若用其他文档平台（Notion/Google Docs），替换此脚本即可。
+> `feishu_doc.py` 直连飞书 OpenAPI（需 `FEISHU_APP_ID` + `FEISHU_APP_SECRET` 环境变量，或 `~/.hermes/configs/feishu.json` fallback）。内置 Markdown→docx blocks 转换（标题/列表/段落/粗体/斜体），分批写入（每批45个，飞书限制50）。若用其他文档平台（Notion/Google Docs），替换此脚本即可。
 
 **框架能力**（用你 agent 框架自带的，不在 skill 内重造）：
 
@@ -134,7 +134,7 @@ python scripts/search.py extract "https://finance.eastmoney.com/..."  # 深读�
 | 实时行情 / 指数 / 个股 | **Step 0 脚本预取**；无脚本时 `web_fetch` 腾讯批量 `qt.gtimg.cn/q=sh000001,sz399001,sz399006,sh000688,sh600519` |
 | 财经快讯 / 政策 / 宏观 | `web_search`：财联社 / 华尔街见闻 / 金十 / 「{日期} 财经要闻」 |
 | 汇率 / 商品 / 外围 | `web_search` 专项 |
-| 舆情 / 热点 | 若有 macro-sentinel 类 skill，用其多源采集补充 |
+| 舆情 / 热点 | 若有 [macro-sentinel](https://github.com/LoganChi/hermes-finance/skills/macro-sentinel) 类 skill，用其多源采集补充 |
 
 ## 财经红线（不可违反）
 
@@ -146,13 +146,13 @@ python scripts/search.py extract "https://finance.eastmoney.com/..."  # 深读�
 
 ## 脚本总览
 
-| 脚本 | 作用 | 依赖 | 凭证 |
-|------|------|------|------|
-| `scripts/fetch_quote.py` | A 股行情抓取（腾讯 `qt.gtimg.cn`，代码识别 + 字段解析 + 涨跌方向） | Python 标准库 | 无 |
-| `scripts/feishu_doc.py` | 飞书云文档（create_doc / read_doc / insert_media，封装 lark-cli） | lark-cli | lark-cli auth |
-| `scripts/gen_image.py` | 图像生成（直连 SenseNova，封面 + 配图，下载到本地） | Python 标准库 | `SENSENOVA_API_KEY` |
-| `scripts/search.py` | 网页搜索+页面深读（Tavily search + extract，多 key 轮换，429 自动换 key） | Python 标准库 | `TAVILY_API_KEY` |
-| `scripts/lint_md.py` | 报告 md 校验/规范化（行内超链接/飞书URL/标题跳级/代码块，针对 lark-cli 限制） | Python 标准库 | 无 |
+| 脚本 | 作用 | 子命令/参数 | 依赖 | 凭证 |
+|------|------|------------|------|------|
+| `scripts/fetch_quote.py` | A 股行情抓取（腾讯 `qt.gtimg.cn`，6位代码自动识别市场前缀，`~` 分隔字段解析，涨跌方向标注） | `python fetch_quote.py 600519` / `python fetch_quote.py sh000001,sz399001` / 无参数=默认指数+龙头 | Python 标准库 | 无 |
+| `scripts/feishu_doc.py` | 飞书云文档（直连 OpenAPI，Markdown→docx blocks 内置转换，分批写入） | `create_doc --title --file/--content` / `read_doc --doc` / `insert_media --doc --file --width --selection` | Python 标准库 | `FEISHU_APP_ID` + `FEISHU_APP_SECRET` |
+| `scripts/gen_image.py` | 图像生成（直连 SenseNova，封面+配图，下载到本地 `./output/`） | `--prompt "..." --size 1920x1080/1024x1024/2048x2048 --negative "..."` | Python 标准库 | `SENSENOVA_API_KEY` |
+| `scripts/search.py` | 网页搜索+页面深读（Tavily 双模式，多 key 轮换，429/401/403 自动换 key） | `search "query" --max N` / `extract url1 url2 ...` | Python 标准库 | `TAVILY_API_KEY`（逗号分隔多 key） |
+| `scripts/lint_md.py` | 报告 md 校验/规范化（7类检查：行内超链接/飞书URL/HTML标签/标题跳级/代码块配对/空链接/空标题） | `report.md --fix`（自动修复写回）/ `report.md --check`（仅检查 exit 1）/ `--out fixed.md` | Python 标准库 | 无 |
 
 每个脚本 `python <script>.py --help` 查看用法，输出均为 JSON（`ok` / `error` / 结果字段）。
 
