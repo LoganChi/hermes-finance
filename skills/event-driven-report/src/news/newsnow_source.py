@@ -7,8 +7,9 @@ API: https://newsnow.busiyi.world/api/s?id={source_id}
 支持的数据源:
   cls-telegraph    财联社电报
   wallstreetcn-news 华尔街见闻
-  36kr-quick       36氪快讯
-  gelonghui        格隆汇
+  jin10            金十数据（宏观经济/央行/外汇商品）
+  gelonghui        格隆汇（港股/A股视角）
+  36kr-quick       36氪快讯（newsnow 已失效）
   ithome           IT之家
 
 正文回填: cls-telegraph 的 detail 页有正文(~1.6k字)，补上喂 LLM 提升事件抽取信息量(噪音率受样本影响、跨天不可比，质量看标的映射准确性)。
@@ -44,8 +45,9 @@ _FETCH_HEADERS = {
 SOURCES = {
     "cls-telegraph": "财联社",
     "wallstreetcn-news": "华尔街见闻",
-    "36kr-quick": "36氪",
+    "jin10": "金十数据",
     "gelonghui": "格隆汇",
+    "36kr-quick": "36氪",
     "ithome": "IT之家",
 }
 
@@ -57,8 +59,8 @@ class NewsnowSource(NewsSource):
 
     def __init__(self, config: Dict[str, Any] = None):
         self.config = config or {}
-        # 默认拉财联社+华尔街见闻（36kr-quick 源在 newsnow 已失效返回0条，去掉）
-        self.sources = self.config.get("sources") or ["cls-telegraph", "wallstreetcn-news"]
+        # 财联社(A股事件) + 华尔街见闻(全球宏观) + 金十(经济数据/央行) + 格隆汇(港股/A股视角)
+        self.sources = self.config.get("sources") or ["cls-telegraph", "wallstreetcn-news", "jin10", "gelonghui"]
         self.limit_per_source = int(self.config.get("limit_per_source", 20))
 
     def fetch(self, limit: int = 50) -> List[NewsItem]:
