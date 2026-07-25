@@ -102,10 +102,10 @@ skill 触发词只覆盖**能进报告管线**的说法（Gate 2 的 reportKeywo
 
 | Skill | 职责 | 触发词特征 |
 |-------|------|-----------|
-| **finance-report**（本 skill） | 维度编排 + web_fetch 预算 + 财经红线；附 `fetch_quote.py` 行情预取脚本 | 财经日报 / 周报 / 报告 |
-| stock-data | A 股个股行情接口（腾讯 / 新浪）字段与解析 | 股价 / 股票 / 行情 / A股 |
-| macro-sentinel | 宏观舆情分析、行业热力图、方向判断 | 宏观 / 舆情 / 热点 / 行业 / 板块 |
-| quant-analyst | 量化策略、回测、因子 | 量化 / 回测 / 策略 / 因子 |
+| **[finance-report](../finance-report/)**（本 skill） | 维度编排 + web_fetch 预算 + 财经红线；附 `fetch_quote.py` 行情预取脚本 | 财经日报 / 周报 / 报告 |
+| [stock-data](https://github.com/LoganChi/hermes-finance/skills/stock-data) | A 股个股行情接口（腾讯 / 新浪）字段与解析 | 股价 / 股票 / 行情 / A股 |
+| [macro-sentinel](https://github.com/LoganChi/hermes-finance/skills/macro-sentinel) | 宏观舆情分析、行业热力图、方向判断 | 宏观 / 舆情 / 热点 / 行业 / 板块 |
+| [quant-analyst](https://github.com/LoganChi/hermes-finance/skills/quant-analyst) | 量化策略、回测、因子 | 量化 / 回测 / 策略 / 因子 |
 
 > 多个 skill 可在 Phase 1 **同时注入**（SkillSelector 无优先级去重，各自独立打分 ≥5 即展开）。本 skill 正文已声明「行情细节用 stock-data、舆情用 macro-sentinel」，避免重复采集。
 

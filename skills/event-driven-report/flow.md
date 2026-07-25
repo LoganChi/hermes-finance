@@ -39,7 +39,7 @@ flowchart TD
 ```mermaid
 flowchart LR
     Req[新闻需求] --> Src{来源}
-    Src -->|财联社/华尔街见闻| NN[newsnow_source.py<br/>二次聚合 + 正文回填]
+    Src -->|财联社/华尔街见闻/金十/格隆汇| NN[newsnow_source.py<br/>四源并发聚合 + 正文回填]
     Src -->|央视历史| CCT[akshare cctv 按日期]
     Src -->|东财实时| GLB[akshare global]
     Src -->|备选| TS[tushare 需 token]
@@ -80,7 +80,7 @@ flowchart LR
 
 ## 六、与 finance-report 的边界
 
-| 维度 | finance-report | event-driven-report（本 skill） |
+| 维度 | [finance-report](../finance-report/) | event-driven-report（本 skill） |
 |------|----------------|-------------------------------|
 | 定位 | 宏观综述 / 日报周报 | 事件驱动 / 标的映射 |
 | 形态 | 轻量指引（方法论 + 仅标准库脚本） | 重型自包含包（完整 Python pipeline） |
@@ -88,4 +88,4 @@ flowchart LR
 | 产出 | 飞书云文档 | 本地 HTML |
 | 触发词 | 财经日报/周报/市场综述 | 事件驱动/盘前扫描/标的映射/催化扫描 |
 
-二者互补：finance-report 回答"今天市场发生了什么"，本 skill 回答"这条新闻利好哪些标的、资金确认了没有"。
+二者互补：[finance-report](../finance-report/) 回答"今天市场发生了什么"，本 skill 回答"这条新闻利好哪些标的、资金确认了没有"。
